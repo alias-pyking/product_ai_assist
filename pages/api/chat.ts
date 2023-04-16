@@ -15,7 +15,7 @@ export const config = {
 
 const handler = async (req: Request): Promise<Response> => {
   try {
-    const {  messages,  prompt, temperature } = (await req.json()) as ChatBody;
+    const { messages, prompt, temperature } = (await req.json()) as ChatBody;
 
     await init((imports) => WebAssembly.instantiate(wasm, imports));
     const encoding = new Tiktoken(
@@ -38,7 +38,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // let tokenCount = prompt_tokens.length;
     let messagesToSend: Message[] = [];
-
+    console.log('MESSAGES 41 api/chat.ts', messages)
     for (let i = messages.length - 1; i >= 0; i--) {
       const message = messages[i];
       const tokens = encoding.encode(message.content);
@@ -52,10 +52,12 @@ const handler = async (req: Request): Promise<Response> => {
 
     encoding.free();
 
-    const stream = await OpenAIStream(promptToSend, temperatureToUse, messagesToSend);
-    console.log('GETTING THE STEREAM 56 api/chat.ts');
-    return new Response(stream);
+    const data = await OpenAIStream(promptToSend, temperatureToUse, messagesToSend);
+    console.log(data, 'DATA 60 api/chat.ts')
+    return new Response(data);
+
   } catch (error) {
+    console.log('ERROR 60 api/chat.ts', error, error.trace, error.stack)
     console.error(error);
     if (error instanceof ServerAPIError) {
       return new Response('Error', { status: 500, statusText: error.message });

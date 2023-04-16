@@ -95,9 +95,11 @@ export const Chat = memo(({ stopConversationRef }: Props) => {
         };
         const endpoint = getEndpoint();
         let body = JSON.stringify(chatBody);
-         
+
         const controller = new AbortController();
-        const response = await fetch(endpoint, {
+        console.log('controller', controller);
+        console.log('body', body);
+        const response = await fetch('http://localhost:8000/api/v1/chat', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -105,13 +107,16 @@ export const Chat = memo(({ stopConversationRef }: Props) => {
           signal: controller.signal,
           body,
         });
+        console.log(response, 'RESPONSE COMING');
         if (!response.ok) {
           homeDispatch({ field: 'loading', value: false });
           homeDispatch({ field: 'messageIsStreaming', value: false });
           toast.error(response.statusText);
           return;
         }
-        const data = response.body;
+        // const data = response.body;
+        let data = await response.json();
+        data = data.data;
         console.log('response gen', data)
         if (!data) {
           homeDispatch({ field: 'loading', value: false });
@@ -128,75 +133,81 @@ export const Chat = memo(({ stopConversationRef }: Props) => {
           };
         }
         homeDispatch({ field: 'loading', value: false });
-        const reader = data.getReader();
-        console.log('reader logtest69', reader);
-        const decoder = new TextDecoder();
+        // const reader = data.getReader();
+        // console.log('reader logtest69', reader);
+        // const decoder = new TextDecoder();
         let done = false;
         let isFirst = true;
         let text = '';
-        while (!done) {
-          if (stopConversationRef.current === true) {
-            controller.abort();
-            done = true;
-            break;
-          }
-          const { value, done: doneReading } = await reader.read();
-          done = doneReading;
-          let data: any = null;
-          console.log(data, 'before parsing');
-          try {
-            data = JSON.parse(decoder.decode(value));
-          } catch (e) {
-            homeDispatch({ field: 'messageIsStreaming', value: false });
-            return;
-          }
-          if (data.entity === 'text') {
-            text += data.items[0].delta.content;
-          }
-          console.log(data, 'DATA HERE');
-          if (isFirst) {
-            isFirst = false;
-            const updatedMessages: Message[] = [
-              ...updatedConversation.messages,
-              { 
-                role: 'assistant', 
-                content: data.entity === 'text' ? data.items[0].delta.content : '',
-                type: data.entity, 
-                items: data.items
-              },
-            ];
-            updatedConversation = {
-              ...updatedConversation,
-              messages: updatedMessages,
-            };
-            homeDispatch({
-              field: 'selectedConversation',
-              value: updatedConversation,
-            });
-          } else {
-            const updatedMessages: Message[] =
-              updatedConversation.messages.map((message, index) => {
-                if (index === updatedConversation.messages.length - 1) {
-                  const msg = {
-                    ...message,
-                    content: text,
-                    type: data.entity, 
-                    items: data.items
-                  };
-                  return msg;
-                }
-                return message;
-              });
-            updatedConversation = {
-              ...updatedConversation,
-              messages: updatedMessages,
-            };
-            homeDispatch({
-              field: 'selectedConversation',
-              value: updatedConversation,
-            });
-          }
+        // while (!done) {
+        if (stopConversationRef.current === true) {
+          controller.abort();
+          done = true;
         }
+        // const { value, done: doneReading } = await reader.read();
+        // done = doneReading;
+        // let data: any = null;
+        // console.log(data, 'before parsing');
+        // try {
+        //   console.log('PARSING DATA', value);
+        //   const textDecoder = new TextDecoder();
+        //   const jsonString = textDecoder.decode(value?.buffer);
+        //   console.log(jsonString, 'jsonString');
+        //   data = JSON.parse(decoder.decode(jsonString));
+
+        // } catch (e) {
+        //   console.log(e, 'error in data parsing')
+        //   homeDispatch({ field: 'messageIsStreaming', value: false });
+        //   return;
+        // }
+        console.log(data, 'after parsing');
+        if (data.entity === 'text') {
+          text += data.items[0].delta.content;
+        }
+        console.log(data, 'DATA HERE');
+        if (isFirst) {
+          isFirst = false;
+          const updatedMessages: Message[] = [
+            ...updatedConversation.messages,
+            {
+              role: 'assistant',
+              content: data.entity === 'text' ? data.items[0].delta.content : '',
+              type: data.entity,
+              items: data.items
+            },
+          ];
+          updatedConversation = {
+            ...updatedConversation,
+            messages: updatedMessages,
+          };
+          homeDispatch({
+            field: 'selectedConversation',
+            value: updatedConversation,
+          });
+        } else {
+          const updatedMessages: Message[] =
+            updatedConversation.messages.map((message, index) => {
+              if (index === updatedConversation.messages.length - 1) {
+                const msg = {
+                  ...message,
+                  content: text,
+                  type: data.entity,
+                  items: data.items
+                };
+                return msg;
+              }
+              return message;
+            });
+          updatedConversation = {
+            ...updatedConversation,
+            messages: updatedMessages,
+          };
+          homeDispatch({
+            field: 'selectedConversation',
+            value: updatedConversation,
+          });
+        }
+        // }
         saveConversation(updatedConversation);
         const updatedConversations: Conversation[] = conversations.map(
           (conversation) => {
@@ -348,55 +359,55 @@ export const Chat = memo(({ stopConversationRef }: Props) => {
 
   return (
     <div className="relative flex-1 overflow-hidden bg-white dark:bg-[#343541]">
-          <div
-            className="max-h-full overflow-x-hidden"
-            ref={chatContainerRef}
-            onScroll={handleScroll}
-          >
-            {selectedConversation?.messages.length === 0 ? (
-                <div className="mx-auto flex w-[350px] flex-col space-y-10 pt-12 sm:w-[600px]">
-                  <div className="text-center text-3xl font-semibold text-gray-800 dark:text-gray-100">
-                      Crush Contlo
-                  </div>
-                </div>
-            ) : (
-              <>
-                {showSettings && (
-                  <div className="flex flex-col space-y-10 md:mx-auto md:max-w-xl md:gap-6 md:py-3 md:pt-6 lg:max-w-2xl lg:px-0 xl:max-w-3xl">
-                  </div>
-                )}
-
-                {selectedConversation?.messages.map((message, index) => (
-                  <ChatMessage
-                    key={index}
-                    message={message}
-                    messageIndex={index}
-                  />
-                ))}
-
-                {loading && <ChatLoader />}
-
-                <div
-                  className="h-[162px] bg-white dark:bg-[#343541]"
-                  ref={messagesEndRef}
-                />
-              </>
-            )}
+      <div
+        className="max-h-full overflow-x-hidden"
+        ref={chatContainerRef}
+        onScroll={handleScroll}
+      >
+        {selectedConversation?.messages.length === 0 ? (
+          <div className="mx-auto flex w-[350px] flex-col space-y-10 pt-12 sm:w-[600px]">
+            <div className="text-center text-3xl font-semibold text-gray-800 dark:text-gray-100">
+              ChatSell
+            </div>
           </div>
+        ) : (
+          <>
+            {showSettings && (
+              <div className="flex flex-col space-y-10 md:mx-auto md:max-w-xl md:gap-6 md:py-3 md:pt-6 lg:max-w-2xl lg:px-0 xl:max-w-3xl">
+              </div>
+            )}
 
-          <ChatInput
-            stopConversationRef={stopConversationRef}
-            textareaRef={textareaRef}
-            onSend={(message) => {
-              setCurrentMessage(message);
-              handleSend(message, 0);
-            }}
-            onRegenerate={() => {
-              if (currentMessage) {
-                handleSend(currentMessage, 2);
-              }
-            }}
-          />
+            {selectedConversation?.messages.map((message, index) => (
+              <ChatMessage
+                key={index}
+                message={message}
+                messageIndex={index}
+              />
+            ))}
+
+            {loading && <ChatLoader />}
+
+            <div
+              className="h-[162px] bg-white dark:bg-[#343541]"
+              ref={messagesEndRef}
+            />
+          </>
+        )}
+      </div>
+
+      <ChatInput
+        stopConversationRef={stopConversationRef}
+        textareaRef={textareaRef}
+        onSend={(message) => {
+          setCurrentMessage(message);
+          handleSend(message, 0);
+        }}
+        onRegenerate={() => {
+          if (currentMessage) {
+            handleSend(currentMessage, 2);
+          }
+        }}
+      />
       {showScrollDownButton && (
         <div className="absolute bottom-0 right-0 mb-4 mr-4 pb-20">
           <button

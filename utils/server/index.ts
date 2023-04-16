@@ -24,7 +24,7 @@ export class ServerAPIError extends Error {
 
 export const OpenAIStream = async (
   systemPrompt: string,
-  temperature : number,
+  temperature: number,
   messages: Message[],
 ) => {
   let url = `${API_HOST}/api/v1/chat`;
@@ -54,6 +54,8 @@ export const OpenAIStream = async (
   const decoder = new TextDecoder();
 
   if (res.status !== 200) {
+    console.log('reaching 67', res.status, res.statusText, res.body)
+
     const result = await res.json();
     if (result.error) {
       throw new ServerAPIError(
@@ -64,42 +66,41 @@ export const OpenAIStream = async (
       );
     } else {
       throw new Error(
-        `OpenAI API returned an error: ${
-          decoder.decode(result?.value) || result.statusText
-        }`,
+        `OpenAI API returned an error`
       );
-    }
+    };
   }
-  console.log('73 reaching');
-  const stream = new ReadableStream({
-    async start(controller) {
-      const onParse = (event: ParsedEvent | ReconnectInterval) => {
-        console.log('on parse 77', event);
-        if (event.type === 'event') {
-          const data = event.data;
-          console.log(data);
-          try {
-            const json = JSON.parse(data);
-            if (json.data.entity === 'response_finished') {
-              controller.close();
-              return;
-            }
-            const queue = encoder.encode(JSON.stringify(json.data));
-            controller.enqueue(queue);
-          } catch (e) {
-            console.log('error 69 here', e);
-            controller.error(e);
-          }
-        }
-      };
 
-      const parser = createParser(onParse);
+  return res;
+  // const stream = new ReadableStream({
+  //   async start(controller) {
+  //     const onParse = (event: ParsedEvent | ReconnectInterval) => {
+  //       console.log('on parse 77', event);
+  //       if (event.type === 'event') {
+  //         const data = event.data;
+  //         console.log(data);
+  //         try {
+  //           const json = JSON.parse(data);
+  //           if (json.data.entity === 'response_finished') {
+  //             controller.close();
+  //             return;
+  //           }
+  //           const queue = encoder.encode(JSON.stringify(json.data));
+  //           controller.enqueue(queue);
+  //         } catch (e) {
+  //           console.log('error 69 here', e);
+  //           controller.error(e);
+  //         }
+  //       }
+  //     };
 
-      for await (const chunk of res.body as any) {
-        parser.feed(decoder.decode(chunk));
-      }
-    },
-  });
+  //     const parser = createParser(onParse);
 
-  return stream;
+  //     for await (const chunk of res.body as any) {
+  //       parser.feed(decoder.decode(chunk));
+  //     }
+  //   },
+  // });
+  // console.log(stream, 'STREAM 104 server/index.ts')
+  // return stream;
 };
